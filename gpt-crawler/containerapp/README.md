@@ -1,14 +1,28 @@
-# Containerized crawler
+# Containerized Crawler Runtime
 
-## Docker image with packaged crawler, with script for building and execution.
+This directory packages the crawler service into a container image for reproducible execution.
 
-All dependencies set up and configured in the Dockerfile. Requires docker to be installed.
+## Prerequisites
 
-## Get started
+- Docker installed and running
 
-### Prerequisites
+## Build and Run
 
-Be sure you have docker installed
+From this directory:
 
-1. `cd gpt-crawler/containerapp `
-2. `. ./run.sh `
+```bash
+./run.sh
+```
+
+The script builds the image and launches the crawler using the mounted `data/` config.
+
+## Configuration
+
+- Update `data/config.ts` before running.
+- Keep output artifacts in mounted data paths only.
+
+## Production Guidance
+
+- Pin image versions in deployment manifests.
+- Run with resource limits to prevent uncontrolled crawl jobs.
+- Route logs to centralized aggregation in hosted environments.

@@ -1,48 +1,110 @@
-**AutoEngage: An Advanced Voice-to-Voice Chatbot**
+# AIColdCaller
 
-https://www.loom.com/share/f54f4016a4df4bb3935d14a2054a6c54?sid=9dae9b21-e51a-457f-932e-7bf1a646bee2
+AIColdCaller is a voice-first outbound engagement platform that combines speech recognition, LLM reasoning, and speech synthesis into a single real-time calling workflow.
 
-This project allows you to interact with a powerful voice-driven chatbot named **AutoEngage**. 
+It is built for teams that need configurable AI call agents, centralized campaign context, and operational analytics without stitching multiple services by hand.
 
-## Project Setup
+## What It Delivers
 
-AutoEngage relies on several external libraries to function. To simplify the process, a handy `setup.sh` script automates the installation. Follow these steps to get AutoEngage up and running:
+- Multi-tenant account model with organizations, teams, and agents
+- WebSocket-based real-time voice conversation loop
+- Pluggable STT, LLM, and TTS backends
+- Agent memory/context handling per conversation
+- Campaign context generation from crawled site content
+- Analytics dashboard for call volume and response-time trends
 
-## Prerequisites
+## Technical Stack
 
-Before we begin, ensure you have the following software installed:
+- Backend: FastAPI, Starlette sessions, SQLAlchemy
+- Realtime transport: WebSockets
+- Database: SQLite by default (via SQLAlchemy)
+- AI components:
+	- STT: Faster-Whisper / Deepgram / HF adapters
+	- LLM: OpenAI-compatible endpoints and local adapters
+	- TTS: ElevenLabs, XTTS, Piper, and other adapter modules
+- Crawler service: Embedded TypeScript crawler module in `gpt-crawler/`
 
-- **Conda:** This tool helps manage virtual environments, keeping autoengage's dependencies isolated from your system.
-- **Bash:** The script utilizes bash commands, so having a bash shell available is crucial.
-- **Git:** We'll use Git to clone the project code from a version control system.
+## Architecture Overview
 
-## Setup Instructions
+1. Browser client streams audio to `/chatws`.
+2. STT adapter transcribes incremental user speech.
+3. LLM adapter generates response tokens using agent prompt context.
+4. TTS adapter synthesizes response audio chunks.
+5. Audio is streamed back to the browser for low-latency playback.
+6. Conversation metadata is persisted for history and analytics.
 
-### Step 1: Clone the Repository
+## Repository Layout
 
-Use the following commands in your terminal to download the autoengage project files:
+- `app.py`: main FastAPI application and orchestration layer
+- `sql/`: ORM models, CRUD helpers, schema definitions
+- `openvoicechat/`: STT/LLM/TTS adapters and runtime utilities
+- `templates/` and `static/`: web UI views and assets
+- `gpt-crawler/`: website crawling pipeline used for knowledge ingestion
+- `utils/`: auth, logging, cookie/session helpers, prompt utilities
+
+## Quick Start
+
+### 1. Clone and prepare environment
 
 ```bash
-git clone https://github.com/sobersalman/autoengage.git
-cd autoengage
+git clone https://github.com/MuhammadAamirGulzar/AIColdCaller.git
+cd AIColdCaller
+python -m venv .venv
 ```
 
-### Step 2: Run the Setup Script
-
-Next, execute the setup.sh script to install the necessary dependencies:
+On Windows:
 
 ```bash
-setup.sh
+.venv\Scripts\activate
 ```
 
-This script automates the installation process, saving you time and effort.
-
-### Step 3: Start the Application
-
-Once the setup is complete, you can launch autoengage by running the Flask application:
+On Linux/macOS:
 
 ```bash
-python app.py
+source .venv/bin/activate
 ```
 
-This command starts the Flask web framework powering autoengage.
+### 2. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure environment variables
+
+```bash
+cp .env.example .env
+```
+
+Fill required values for JWT/session keys and provider credentials.
+
+### 4. Run the API
+
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Open `http://localhost:8000`.
+
+## Security Notes
+
+- Passwords are stored as hashed values, not plaintext.
+- Do not commit `.env`, certificates, generated audio, or crawler output.
+- Rotate all keys before any public deployment.
+
+## Deployment Notes
+
+- Replace SQLite with managed Postgres for production workloads.
+- Terminate TLS at a reverse proxy (Nginx, Caddy, or cloud LB).
+- Run workers and API separately if scaling concurrent calls.
+- Add centralized logs/metrics for call latency and model failures.
+
+## GitHub Metadata Recommendation
+
+- Suggested repository name: `ai-voice-sales-agent`
+- Suggested description: `Real-time AI voice sales agent with multi-tenant orchestration, analytics, and pluggable STT/LLM/TTS pipelines.`
+- Suggested topics: `ai`, `voice-ai`, `fastapi`, `websocket`, `speech-to-text`, `text-to-speech`, `llm`, `sales-automation`, `conversational-ai`, `python`
+
+## License
+
+This project is licensed under Creative Commons Attribution-NonCommercial 4.0 International. See `LICENSE`.
