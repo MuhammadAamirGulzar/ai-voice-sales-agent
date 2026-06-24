@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from . import models, schemas
+from werkzeug.security import check_password_hash, generate_password_hash
 
 
 # User CRUD Operations
@@ -10,7 +11,7 @@ def create_user(db: Session, user: schemas.UserCreate):
         email=user.email,
         phone_number=user.phone_number,
         username=user.username,
-        password=user.password,
+        password=generate_password_hash(user.password),
     )
     db.add(new_user)
     db.commit()
@@ -38,7 +39,7 @@ def update_user(db: Session, username: str, user: schemas.UserUpdate):
         if user.username is not None:
             db_user.username = user.username
         if user.password is not None:
-            db_user.password = user.password
+            db_user.password = generate_password_hash(user.password)
         if user.organization_id is not None:
             db_user.organization_id = user.organization_id
         db.commit()
@@ -59,7 +60,7 @@ def delete_user(db: Session, username: str):
 def authenticate_user(db: Session, username: str, password: str):
     try:
         user = db.query(models.User).filter(models.User.username == username).one()
-        if user and user.password == password:
+        if user and check_password_hash(user.password, password):
             return user
     except NoResultFound:
         return None

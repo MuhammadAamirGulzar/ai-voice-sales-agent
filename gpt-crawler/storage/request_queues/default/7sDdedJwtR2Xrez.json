@@ -1,9 +1,0 @@
-{
-	"id": "7sDdedJwtR2Xrez",
-	"json": "{\"id\":\"7sDdedJwtR2Xrez\",\"url\":\"http://www.builder.io/m/pricing\",\"loadedUrl\":\"http://www.builder.io/m/pricing\",\"uniqueKey\":\"http://www.builder.io/m/pricing\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"skipNavigation\":false,\"state\":4}},\"handledAt\":\"2024-10-02T05:25:19.262Z\"}",
-	"method": "GET",
-	"orderNo": null,
-	"retryCount": 0,
-	"uniqueKey": "http://www.builder.io/m/pricing",
-	"url": "http://www.builder.io/m/pricing"
-}

@@ -1,9 +1,0 @@
-{
-	"id": "kak4RUrpISDEse1",
-	"json": "{\"id\":\"kak4RUrpISDEse1\",\"url\":\"http://www.builder.io/signup\",\"uniqueKey\":\"http://www.builder.io/signup\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"skipNavigation\":false}}}",
-	"method": "GET",
-	"orderNo": 1727846719250,
-	"retryCount": 0,
-	"uniqueKey": "http://www.builder.io/signup",
-	"url": "http://www.builder.io/signup"
-}

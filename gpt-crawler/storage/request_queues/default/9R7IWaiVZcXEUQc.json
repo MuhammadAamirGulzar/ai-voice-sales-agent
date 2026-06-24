@@ -1,9 +1,0 @@
-{
-	"id": "9R7IWaiVZcXEUQc",
-	"json": "{\"id\":\"9R7IWaiVZcXEUQc\",\"url\":\"http://www.builder.io\",\"loadedUrl\":\"http://www.builder.io/\",\"uniqueKey\":\"http://www.builder.io\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"state\":4}},\"handledAt\":\"2024-10-02T05:25:15.438Z\"}",
-	"method": "GET",
-	"orderNo": null,
-	"retryCount": 0,
-	"uniqueKey": "http://www.builder.io",
-	"url": "http://www.builder.io"
-}

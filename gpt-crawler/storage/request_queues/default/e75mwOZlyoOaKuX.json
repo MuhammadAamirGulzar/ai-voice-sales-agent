@@ -1,9 +1,0 @@
-{
-	"id": "e75mwOZlyoOaKuX",
-	"json": "{\"id\":\"e75mwOZlyoOaKuX\",\"url\":\"http://www.builder.io/m/products\",\"uniqueKey\":\"http://www.builder.io/m/products\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"__crawlee\":{\"skipNavigation\":false}}}",
-	"method": "GET",
-	"orderNo": 1727846715401,
-	"retryCount": 0,
-	"uniqueKey": "http://www.builder.io/m/products",
-	"url": "http://www.builder.io/m/products"
-}

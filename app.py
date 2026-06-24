@@ -45,6 +45,8 @@ import openai
 from openai import OpenAI
 import re
 
+load_dotenv()
+
 def get_context(self):
     return self.messages
 
@@ -57,14 +59,19 @@ Chatbot.get_context = get_context
 Chatbot.set_context = set_context
 
 
-SESSION_MIDDLEWARE_SECRET_KEY = os.getenv("SESSION_MIDDLEWARE_SECRET_KEY", "SECRET")
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default_secret_key")
+SESSION_MIDDLEWARE_SECRET_KEY = os.getenv("SESSION_MIDDLEWARE_SECRET_KEY")
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ALGORITHM = "HS256"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 EAR_MODEL_ID = "openai/whisper-medium"  # "openai/whisper-small.en" or "distil-whisper/distil-large-v3"
 CHATBOT_MODEL = "gpt-4o-mini"
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
+
+if not SESSION_MIDDLEWARE_SECRET_KEY or not JWT_SECRET_KEY:
+    raise RuntimeError(
+        "Missing required environment variables: SESSION_MIDDLEWARE_SECRET_KEY and JWT_SECRET_KEY"
+    )
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
@@ -73,7 +80,6 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(router, prefix="/api")
 
-load_dotenv()
 #chatbot = Chatbot(Model=CHATBOT_MODEL)
 chatbot = Chatbot()
 
