@@ -99,12 +99,6 @@ Open `http://localhost:8000`.
 - Run workers and API separately if scaling concurrent calls.
 - Add centralized logs/metrics for call latency and model failures.
 
-## GitHub Metadata Recommendation
-
-- Suggested repository name: `ai-voice-sales-agent`
-- Suggested description: `Real-time AI voice sales agent with multi-tenant orchestration, analytics, and pluggable STT/LLM/TTS pipelines.`
-- Suggested topics: `ai`, `voice-ai`, `fastapi`, `websocket`, `speech-to-text`, `text-to-speech`, `llm`, `sales-automation`, `conversational-ai`, `python`
-
 ## License
 
 This project is licensed under Creative Commons Attribution-NonCommercial 4.0 International. See `LICENSE`.
