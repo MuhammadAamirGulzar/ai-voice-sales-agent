@@ -116,6 +116,16 @@ try:
 except Exception as _out_err:
     print(f"Outbound calling disabled: {_out_err}")
 
+# Prometheus scrape target for the voice engine (aggregates only).
+from voice.telemetry import telemetry as _voice_telemetry
+from fastapi import Response as _MetricsResponse
+
+
+@app.get("/metrics")
+async def metrics():
+    return _MetricsResponse(content=_voice_telemetry.render_prometheus(),
+                            media_type="text/plain; version=0.0.4")
+
 #chatbot = Chatbot(Model=CHATBOT_MODEL)
 chatbot = Chatbot()
 
