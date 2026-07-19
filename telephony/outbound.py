@@ -21,7 +21,9 @@ X-API-Key header.
 
 import asyncio
 import base64
+import hmac
 import json
+import logging
 import os
 import time
 import urllib.parse
@@ -29,17 +31,68 @@ from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 
 from sql.database import SessionLocal
 from sql import models
+from telephony.twilio_security import twilio_signature_valid
 from voice.config import VoiceConfig
 from voice.pipeline import CallSession, TwilioTransport
+from voice.telemetry import telemetry
+
+log = logging.getLogger("voice.outbound")
 
 router = APIRouter()
 
 TWILIO_API = "https://api.twilio.com/2010-04-01"
+
+# One client for all Twilio REST calls in the process. A per-request
+# client pays a fresh TLS handshake on every originate — noticeable when
+# a campaign dials in bursts.
+_twilio_http: Optional[httpx.AsyncClient] = None
+
+
+def _twilio_client() -> httpx.AsyncClient:
+    global _twilio_http
+    if _twilio_http is None or _twilio_http.is_closed:
+        _twilio_http = httpx.AsyncClient(
+            timeout=httpx.Timeout(15.0, connect=5.0),
+            limits=httpx.Limits(max_connections=50,
+                                max_keepalive_connections=10,
+                                keepalive_expiry=120.0),
+        )
+    return _twilio_http
+
+
+def _signature_validation_enabled() -> bool:
+    return os.getenv("TWILIO_VALIDATE_SIGNATURE", "").lower() in ("1", "true", "yes")
+
+
+def _webhook_url_for_signature(request: Request) -> str:
+    """The URL Twilio signed. Behind a proxy/tunnel the request URL is the
+    internal one, so prefer PUBLIC_BASE_URL when configured."""
+    base = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+    if base:
+        url = base + request.url.path
+        if request.url.query:
+            url += "?" + request.url.query
+        return url
+    return str(request.url)
+
+
+def _reject_bad_signature(request: Request, params: dict) -> Optional[Response]:
+    if not _signature_validation_enabled():
+        return None
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+    signature = request.headers.get("X-Twilio-Signature", "")
+    if not twilio_signature_valid(auth_token,
+                                  _webhook_url_for_signature(request),
+                                  params, signature):
+        log.warning("rejected %s request with bad Twilio signature",
+                    request.url.path)
+        return Response(status_code=403)
+    return None
 
 DEFAULT_SALES_PROMPT = (
     "You are a friendly outbound sales agent. Introduce yourself and the "
@@ -81,7 +134,7 @@ def _load_agent_context(agent_id: int) -> dict:
             from utils.prompts import get_prompt
             system_prompt = get_prompt(organization, team, agent)
         except Exception as e:
-            print(f"[outbound] prompt build failed ({e}); using default")
+            log.warning("prompt build failed (%s); using default", e)
             system_prompt = DEFAULT_SALES_PROMPT
         greeting = (
             f"Hello! This is {agent.name} calling from "
@@ -108,8 +161,16 @@ def _load_agent_context(agent_id: int) -> dict:
 async def outbound_call(body: OutboundCallRequest,
                         x_api_key: Optional[str] = Header(default=None)):
     required_key = os.getenv("OUTBOUND_API_KEY", "").strip()
-    if required_key and x_api_key != required_key:
+    if required_key and not hmac.compare_digest(x_api_key or "", required_key):
         raise HTTPException(status_code=401, detail="Bad or missing X-API-Key.")
+
+    # Load shedding: past capacity, refuse to originate rather than give
+    # every live call a degraded conversation. Campaign runners retry on 429.
+    max_calls = int(os.getenv("MAX_CONCURRENT_CALLS", "0") or 0)
+    if max_calls and telemetry.calls_active >= max_calls:
+        raise HTTPException(status_code=429, detail=(
+            f"At capacity ({telemetry.calls_active} active calls); "
+            "retry shortly."))
 
     sid, token, from_number = _twilio_creds()
     public_base = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
@@ -130,20 +191,44 @@ async def outbound_call(body: OutboundCallRequest,
         "From": from_number,
         "Url": webhook,
         "Method": "POST",
+        # Final call outcome (completed / no-answer / busy / failed) so
+        # campaign tooling can tell "talked" from "never picked up".
+        "StatusCallback": f"{public_base}/outbound-status?agent_id={body.agent_id}",
+        "StatusCallbackMethod": "POST",
     }
     if os.getenv("MACHINE_DETECTION", "false").lower() in ("1", "true", "yes"):
         data["MachineDetection"] = "DetectMessageEnd"
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.post(
+    try:
+        resp = await _twilio_client().post(
             f"{TWILIO_API}/Accounts/{sid}/Calls.json",
             data=data, auth=(sid, token))
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502,
+                            detail=f"Twilio unreachable: {e}")
     if resp.status_code >= 300:
         raise HTTPException(status_code=502,
                             detail=f"Twilio originate failed: {resp.text[:300]}")
     call = resp.json()
-    print(f"[outbound] originated call {call.get('sid')} → {body.to_number}")
+    log.info("originated call %s -> %s (agent=%s)",
+             call.get("sid"), body.to_number, body.agent_id)
     return {"call_sid": call.get("sid"), "status": call.get("status")}
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Final call status (Twilio StatusCallback)
+# ─────────────────────────────────────────────────────────────────────────
+@router.post("/outbound-status")
+async def outbound_status(request: Request):
+    form = await request.form()
+    rejected = _reject_bad_signature(request, dict(form))
+    if rejected is not None:
+        return rejected
+    log.info("call %s status=%s duration=%ss answered_by=%s agent=%s",
+             form.get("CallSid", ""), form.get("CallStatus", ""),
+             form.get("CallDuration", ""), form.get("AnsweredBy", ""),
+             request.query_params.get("agent_id", ""))
+    return Response(status_code=204)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -153,13 +238,20 @@ async def outbound_call(body: OutboundCallRequest,
 async def outbound_voice(request: Request):
     params = dict(request.query_params)
     form = await request.form() if request.method == "POST" else {}
+    rejected = _reject_bad_signature(request, dict(form))
+    if rejected is not None:
+        return rejected
     answered_by = (form.get("AnsweredBy") or "").lower()
 
     from twilio.twiml.voice_response import VoiceResponse, Connect
 
     response = VoiceResponse()
+    if answered_by == "fax":
+        response.hangup()
+        return HTMLResponse(content=str(response), media_type="application/xml")
     if answered_by.startswith("machine"):
         # Voicemail: leave a short message instead of talking to a beep.
+        log.info("answering machine detected — dropping voicemail")
         response.say(
             "Hello! Sorry we missed you. We'll try to reach you again "
             "at a better time. Goodbye.")
@@ -188,12 +280,12 @@ async def twilio_media_stream_out(websocket: WebSocket,
                                   agent_id: Optional[int] = None,
                                   to_number: Optional[str] = None):
     await websocket.accept()
-    print(f"[outbound] media stream connected (agent={agent_id}, to={to_number})")
+    log.info("media stream connected (agent=%s, to=%s)", agent_id, to_number)
 
     config = VoiceConfig.from_env()
     if not config.streaming_ready:
-        print("[outbound] missing DEEPGRAM_API_KEY / LLM key — cannot run "
-              "streaming pipeline; closing.")
+        log.error("missing DEEPGRAM_API_KEY / LLM key — cannot run "
+                  "streaming pipeline; closing.")
         await websocket.close()
         return
 
@@ -211,7 +303,13 @@ async def twilio_media_stream_out(websocket: WebSocket,
         call_sid = start.get("callSid", "")
         call_start = time.time()
 
-        context = await asyncio.to_thread(_load_agent_context, agent_id or 0)
+        # A DB hiccup must not kill a live call — degrade to the default
+        # sales persona instead.
+        try:
+            context = await asyncio.to_thread(_load_agent_context, agent_id or 0)
+        except Exception as e:
+            log.error("agent context lookup failed (%s) — using defaults", e)
+            context = {}
         config.system_prompt = context.get("system_prompt", DEFAULT_SALES_PROMPT)
         config.greeting = context.get(
             "greeting", "Hello! Do you have a quick minute?")
@@ -251,12 +349,13 @@ async def twilio_media_stream_out(websocket: WebSocket,
             elif event == "start":
                 await handle_start(message)
             elif event == "stop":
+                log.info("stop event received")
                 break
             receive_task = asyncio.create_task(websocket.receive_text())
     except WebSocketDisconnect:
-        print("[outbound] media stream disconnected")
+        log.info("media stream disconnected")
     except Exception as e:
-        print(f"[outbound] media stream error: {e}")
+        log.exception("media stream error: %s", e)
     finally:
         receive_task.cancel()
         if ended_task is not None:
@@ -265,11 +364,15 @@ async def twilio_media_stream_out(websocket: WebSocket,
             await session.shutdown()
         if session_task is not None:
             session_task.cancel()
+            try:
+                await asyncio.wait_for(session_task, timeout=5.0)
+            except (asyncio.CancelledError, asyncio.TimeoutError, Exception):
+                pass
 
         if session is not None and call_start is not None and context:
             duration = int(time.time() - call_start)
             metrics_dict = session.metrics.to_dict()
-            print(session.metrics.log_line())
+            log.info("%s", session.metrics.log_line())
             await asyncio.to_thread(
                 _persist_call, context, session.messages, metrics_dict, duration)
 
@@ -299,10 +402,10 @@ def _persist_call(context: dict, messages: list, metrics_dict: dict,
             record.metrics = metrics_dict
         db.add(record)
         db.commit()
-        print(f"[outbound] call persisted ({duration_seconds}s, "
-              f"{summary.get('turn_count', 0)} turns)")
+        log.info("call persisted (%ds, %d turns)",
+                 duration_seconds, summary.get("turn_count", 0))
     except Exception as e:
-        print(f"[outbound] persist failed: {e}")
+        log.error("persist failed: %s", e)
         db.rollback()
     finally:
         db.close()

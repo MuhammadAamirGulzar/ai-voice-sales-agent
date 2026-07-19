@@ -1,3 +1,4 @@
+import logging
 import time
 import os
 import queue
@@ -56,6 +57,13 @@ from openai import OpenAI
 import re
 
 load_dotenv()
+
+# Structured logs for the voice engine (uvicorn configures its own loggers;
+# this covers the "voice.*" hierarchy). LOG_LEVEL=DEBUG for verbose runs.
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+)
 
 def get_context(self):
     return self.messages
@@ -125,6 +133,17 @@ from fastapi import Response as _MetricsResponse
 async def metrics():
     return _MetricsResponse(content=_voice_telemetry.render_prometheus(),
                             media_type="text/plain; version=0.0.4")
+
+
+@app.on_event("startup")
+async def _voice_startup():
+    # Keep a warm connection to the LLM provider so the first turn of any
+    # call never pays a cold TCP+TLS handshake (measured: 6.8 s cold TTFT
+    # vs 265 ms warm on a high-RTT link).
+    from voice.config import VoiceConfig
+    from voice.llm import start_llm_keepalive
+    _cfg = VoiceConfig.from_env()
+    start_llm_keepalive(_cfg.llm_base_url, _cfg.llm_api_key)
 
 #chatbot = Chatbot(Model=CHATBOT_MODEL)
 chatbot = Chatbot()
