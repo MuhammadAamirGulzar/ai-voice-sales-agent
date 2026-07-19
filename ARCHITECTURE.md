@@ -2,7 +2,7 @@
 
 ## System Context
 
-AIColdCaller provides real-time voice conversations between end users and AI sales agents.
+VoxReach provides real-time voice conversations between end users and AI sales agents.
 
 Core responsibilities:
 - Ingest audio from client sessions

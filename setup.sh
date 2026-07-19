@@ -17,8 +17,8 @@ apt install portaudio19-dev -y
 apt install lshw -y
 
 # Create and activate a conda environment
-conda create --name autoengage python=3.10.6 -y
-conda activate autoengage
+conda create --name voxreach python=3.10.6 -y
+conda activate voxreach
 
 # Install Python dependencies inside the conda environment
 pip install -r requirements.txt

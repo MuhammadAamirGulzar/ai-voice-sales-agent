@@ -1,6 +1,6 @@
-# AIColdCaller
+# VoxReach — AI Voice Sales Agent
 
-AIColdCaller is a voice-first outbound engagement platform that combines speech recognition, LLM reasoning, and speech synthesis into a single real-time calling workflow.
+VoxReach is a voice-first outbound engagement platform that combines speech recognition, LLM reasoning, and speech synthesis into a single real-time calling workflow.
 
 It is built for teams that need configurable AI call agents, centralized campaign context, and operational analytics without stitching multiple services by hand.
 
@@ -47,8 +47,8 @@ It is built for teams that need configurable AI call agents, centralized campaig
 ### 1. Clone and prepare environment
 
 ```bash
-git clone https://github.com/MuhammadAamirGulzar/AIColdCaller.git
-cd AIColdCaller
+git clone https://github.com/MuhammadAamirGulzar/ai-voice-sales-agent.git
+cd ai-voice-sales-agent
 python -m venv .venv
 ```
 
