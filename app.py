@@ -110,7 +110,7 @@ app.include_router(router, prefix="/api")
 
 # Outbound telephony (streaming voice engine over Twilio Media Streams).
 try:
-    from twilio_outbound import router as outbound_router
+    from telephony.outbound import router as outbound_router
     app.include_router(outbound_router)
     print("Outbound calling routes registered.")
 except Exception as _out_err:

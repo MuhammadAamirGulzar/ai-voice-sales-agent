@@ -78,7 +78,7 @@ python -m pytest tests/test_voice.py -q     # 17 provider-free unit tests
 - `openvoicechat/`: STT/LLM/TTS adapters and runtime utilities
 - `templates/` and `static/`: web UI views and assets
 - `voice/`: streaming telephony engine (STT/LLM/TTS, barge-in, metrics)
-- `twilio_outbound.py`: outbound call origination and media-stream handling
+- `telephony/outbound.py`: outbound call origination and media-stream handling
 - `utils/`: auth, logging, cookie/session helpers, prompt utilities
 
 ## Quick Start

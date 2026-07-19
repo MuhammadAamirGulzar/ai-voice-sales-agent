@@ -3,13 +3,13 @@ if __name__ == "__main__":
     import sys
     import os
 
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
     from Minibot import Minibot
     from constants import FILLERS
 else:
     from .base import BaseChatbot
-    from Minibot import Minibot
-    from constants import FILLERS
+    from ..Minibot import Minibot
+    from ..constants import FILLERS
 
 import os
 import json
@@ -19,10 +19,10 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from openai._types import NOT_GIVEN
 
-import send_email
+from utils.mailer import send_email
 
 def schedule_call(email):
-    send_email(receiver=email, subject="Call Scheduled!", body="Your call has been scheduled with our agent.")
+    send_email(receiver_email=email, subject="Call Scheduled!", body="Your call has been scheduled with our agent.")
     return {"status": "Call scheduled", "email": email}
 
 
