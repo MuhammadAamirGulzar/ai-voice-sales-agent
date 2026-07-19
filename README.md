@@ -1,5 +1,7 @@
 # VoxReach — AI Voice Sales Agent
 
+[![tests](https://github.com/MuhammadAamirGulzar/ai-voice-sales-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/MuhammadAamirGulzar/ai-voice-sales-agent/actions/workflows/tests.yml)
+
 VoxReach is a voice-first outbound engagement platform that combines speech recognition, LLM reasoning, and speech synthesis into a single real-time calling workflow.
 
 It is built for teams that need configurable AI call agents, centralized campaign context, and operational analytics without stitching multiple services by hand.
