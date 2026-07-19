@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     ear = Ear_hf(device=device)
 
-    audio, sr = torchaudio.load("/home/salman/Desktop/converso/welcome.wav")
+    audio, sr = torchaudio.load("welcome.wav")
     audio = F.resample(audio, sr, 16_000)[0]
     text = ear.transcribe(np.array(audio))
     text = ear.listen()

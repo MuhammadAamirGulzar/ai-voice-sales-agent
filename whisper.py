@@ -10,8 +10,8 @@ from openai import OpenAI
 # Import your Piper mouth class
 from openvoicechat.tts.base import BaseMouth
 class Mouth_piper(BaseMouth):
-    def __init__(self, device='cpu', model_path='/home/salman/Desktop/autoengage/en_US-ryan-high.onnx',
-                 config_path='/home/salman/Desktop/autoengage/en_US-ryan-high.onnx.json',
+    def __init__(self, device='cpu', model_path='models/en_US-ryan-high.onnx',
+                 config_path='models/en_US-ryan-high.onnx.json',
                  player=sd):
         import piper
         self.model = piper.PiperVoice.load(model_path=model_path,
@@ -105,8 +105,8 @@ def process_tts(mouth):
 def main():
     # Initialize Piper TTS with your configuration
     device = os.environ.get("PIPER_DEVICE", "cpu")
-    model_path = os.environ.get("PIPER_MODEL_PATH", "/home/salman/Desktop/autoengage/en_US-ryan-high.onnx")
-    config_path = os.environ.get("PIPER_CONFIG_PATH", "/home/salman/Desktop/autoengage/en_US-ryan-high.onnx.json")
+    model_path = os.environ.get("PIPER_MODEL_PATH", "models/en_US-ryan-high.onnx")
+    config_path = os.environ.get("PIPER_CONFIG_PATH", "models/en_US-ryan-high.onnx.json")
     
     # Create TTS engine
     print(f"Initializing Piper with model: {model_path}")
