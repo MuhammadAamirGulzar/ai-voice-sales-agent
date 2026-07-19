@@ -105,6 +105,9 @@ class ChatHistory(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=True
     )
     response_time = Column(Float, nullable=True)
+    # Per-turn latency waterfall from the streaming voice engine
+    # (voice/metrics.py CallMetrics.to_dict()).
+    metrics = Column(JSON, nullable=True)
 
     organization = relationship("Organization", back_populates="chat_histories")
     team = relationship("Team", back_populates="chat_histories")

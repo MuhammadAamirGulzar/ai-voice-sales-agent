@@ -6,12 +6,48 @@ It is built for teams that need configurable AI call agents, centralized campaig
 
 ## What It Delivers
 
+- **Real outbound phone calls over Twilio** — streaming Deepgram STT →
+  token-streaming LLM → streaming TTS with barge-in, answering-machine
+  detection, transfer/end-call tools, and per-turn latency metrics
 - Multi-tenant account model with organizations, teams, and agents
-- WebSocket-based real-time voice conversation loop
+- Browser-based real-time voice conversation loop (WebSocket demo mode)
 - Pluggable STT, LLM, and TTS backends
 - Agent memory/context handling per conversation
 - Campaign context generation from crawled site content
 - Analytics dashboard for call volume and response-time trends
+
+## Outbound Calling (streaming voice engine)
+
+The `voice/` package is the production call pipeline (shared with the
+companion inbound platform): one asyncio task tree per call, μ-law 8 kHz
+end to end (zero transcoding), sentence-level TTS pipelining, barge-in
+with Twilio `clear` + mark-based history truncation, and a per-turn
+latency waterfall persisted with each call record.
+
+Place a call:
+
+```bash
+# .env needs: DEEPGRAM_API_KEY, GROQ_API_KEY, TWILIO_ACCOUNT_SID,
+#             TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, PUBLIC_BASE_URL
+curl -X POST http://localhost:8000/api/outbound-call \
+  -H "Content-Type: application/json" -H "X-API-Key: $OUTBOUND_API_KEY" \
+  -d '{"to_number": "+15551234567", "agent_id": 1}'
+```
+
+Flow: Twilio originates from your number → callee answers →
+`/outbound-voice` webhook (voicemail drop if `MACHINE_DETECTION=true`
+and a machine answers) → `<Connect><Stream>` media stream → the sales
+agent (organization → team → agent prompt) speaks first and runs the
+conversation with interruption handling and call-control tools.
+
+Test the pipeline without telephony using the simulator (emulates a
+Twilio media stream, measures response latency, verifies barge-in):
+
+```bash
+python tools/call_simulator.py --say "Hello?" "I'm listening, go ahead." \
+    "Not interested, please remove me from your list."
+python -m pytest tests/test_voice.py -q     # 17 provider-free unit tests
+```
 
 ## Technical Stack
 

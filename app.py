@@ -4,7 +4,10 @@ import queue
 import threading
 from typing import Optional
 from dotenv import load_dotenv
-import torch
+try:
+    import torch
+except ImportError:
+    torch = None  # cloud-streaming-only deployment (no local ML stack)
 import uvicorn
 from fastapi import Depends, FastAPI, Form, Request, WebSocket, WebSocketDisconnect  # type: ignore
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -21,21 +24,28 @@ from utils.cookies import validate_admin_cookies, validate_cookies
 from utils.logger import log_response_time, print_info, print_error, print_warning
 from utils.prompts import get_products, get_prompt
 
-from openvoicechat.tts.tts_elevenlabs import Mouth_elevenlabs
-from openvoicechat.tts.tts_xtts import Mouth_xtts
-from openvoicechat.tts.tts_piper import Mouth_piper
-from openvoicechat.llm.llm_EC2 import Chatbot_LLM as Chatbot
-
 # Add these imports at the top of your app.py file
 from datetime import datetime, timedelta
 from sqlalchemy import func, text
 
-#from openvoicechat.stt.stt_hf import Ear_hf as Ear
-#from openvoicechat.stt.stt_deepgram import Ear_deepgram as Ear
+# Local browser-mic voice stack (torch/whisper/piper). Optional: outbound
+# telephony uses the cloud streaming engine in voice/ and works without it.
+try:
+    from openvoicechat.tts.tts_elevenlabs import Mouth_elevenlabs
+    from openvoicechat.tts.tts_xtts import Mouth_xtts
+    from openvoicechat.tts.tts_piper import Mouth_piper
+    from openvoicechat.llm.llm_EC2 import Chatbot_LLM as Chatbot
+    from openvoicechat.stt.stt_faster_whisper import Ear_faster_whisper as Ear
+    from openvoicechat.utils import run_chat, Listener_ws, Player_ws, run_chat_langchain
+    LOCAL_VOICE_STACK = True
+except ImportError as _local_err:
+    print(f"Local voice stack unavailable ({_local_err}); "
+          "browser /chatws demo disabled, outbound telephony unaffected.")
+    LOCAL_VOICE_STACK = False
 
-from openvoicechat.stt.stt_faster_whisper import Ear_faster_whisper as Ear
-
-from openvoicechat.utils import run_chat, Listener_ws, Player_ws,run_chat_langchain
+    class Chatbot:  # minimal stand-in so module-level chatbot init works
+        def __init__(self, *args, **kwargs):
+            self.messages = []
 
 
 from pydantic import BaseModel
@@ -63,7 +73,7 @@ SESSION_MIDDLEWARE_SECRET_KEY = os.getenv("SESSION_MIDDLEWARE_SECRET_KEY")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ALGORITHM = "HS256"
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+DEVICE = "cuda" if (torch is not None and torch.cuda.is_available()) else "cpu"
 EAR_MODEL_ID = "openai/whisper-medium"  # "openai/whisper-small.en" or "distil-whisper/distil-large-v3"
 CHATBOT_MODEL = "gpt-4o-mini"
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
@@ -74,11 +84,27 @@ if not SESSION_MIDDLEWARE_SECRET_KEY or not JWT_SECRET_KEY:
     )
 
 models.Base.metadata.create_all(bind=engine)
+
+# Additive migration for pre-existing databases (voice engine columns).
+from sql.database import ensure_columns
+try:
+    ensure_columns()
+except Exception as _mig_err:
+    print(f"[db] column migration warning: {_mig_err}")
+
 app = FastAPI()
 app.add_middleware(SessionMiddleware, secret_key=SESSION_MIDDLEWARE_SECRET_KEY)
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(router, prefix="/api")
+
+# Outbound telephony (streaming voice engine over Twilio Media Streams).
+try:
+    from twilio_outbound import router as outbound_router
+    app.include_router(outbound_router)
+    print("Outbound calling routes registered.")
+except Exception as _out_err:
+    print(f"Outbound calling disabled: {_out_err}")
 
 #chatbot = Chatbot(Model=CHATBOT_MODEL)
 chatbot = Chatbot()
@@ -1007,6 +1033,13 @@ async def home(request: Request) -> HTMLResponse:
 @app.websocket("/chatws")
 async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     await websocket.accept()
+
+    if not LOCAL_VOICE_STACK:
+        await websocket.close(
+            code=1011,
+            reason="Local voice stack not installed (browser demo needs "
+                   "requirements.txt); outbound telephony is unaffected.")
+        return
     print("WebSocket Connected.")
 
     cookie_header = websocket.headers.get("cookie")
