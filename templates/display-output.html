@@ -64,7 +64,7 @@
         // Fetch and display the output.json content using current_username
         const currentUsername = "{{ current_username }}"; // Injected from FastAPI
     
-        fetch(`/gpt-crawler/${currentUsername}-1.json`)
+        fetch(`/crawler-output`)
         .then(response => response.text())  // Fetch as plain text
         .then(data => {
             // Replace all `\n` with actual HTML line breaks

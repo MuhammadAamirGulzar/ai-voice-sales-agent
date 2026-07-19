@@ -74,6 +74,16 @@ JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 ALGORITHM = "HS256"
 DEVICE = "cuda" if (torch is not None and torch.cuda.is_available()) else "cpu"
+
+# Site crawler used for campaign knowledge ingestion. This is an external
+# tool (https://github.com/BuilderIO/gpt-crawler), not part of this repo:
+#   git clone https://github.com/BuilderIO/gpt-crawler && cd gpt-crawler && npm install
+# Point CRAWLER_DIR elsewhere if you keep it outside the project root.
+CRAWLER_DIR = os.getenv("CRAWLER_DIR", "gpt-crawler")
+
+
+def crawler_installed() -> bool:
+    return os.path.isdir(CRAWLER_DIR)
 EAR_MODEL_ID = "openai/whisper-medium"  # "openai/whisper-small.en" or "distil-whisper/distil-large-v3"
 CHATBOT_MODEL = "gpt-4o-mini"
 DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
@@ -463,7 +473,7 @@ async def create_organization(
         return HTMLResponse(content=f"<script>window.alert('{error_message}'); window.history.back();</script>", status_code=400)
 
     # Access the user's JSON file
-    json_file_path = f"gpt-crawler/{current_username}-1.json"
+    json_file_path = os.path.join(CRAWLER_DIR, f"{current_username}-1.json")
     if os.path.exists(json_file_path) and os.path.getsize(json_file_path) > 0:
         try:
             with open(json_file_path, "r", encoding="utf-8") as json_file:  # Specify encoding
@@ -522,8 +532,21 @@ async def team_details(request: Request, db: Session = Depends(get_db)):
     )
 
 
-## Endpoint for display-output page (GET Request)
-app.mount("/gpt-crawler", StaticFiles(directory="gpt-crawler"), name="gpt-crawler")
+## Crawl output for the logged-in user (replaces the old static mount of
+## the whole crawler directory, which also exposed its source and config).
+@app.get("/crawler-output")
+async def crawler_output(request: Request, db: Session = Depends(get_db)):
+    result = validate_cookies(db, request, ["current_username"])
+    if not result["success"]:
+        return result["response"]
+    current_username = result["cookies"]["current_username"]
+
+    json_file_path = os.path.join(CRAWLER_DIR, f"{current_username}-1.json")
+    if not os.path.exists(json_file_path):
+        return JSONResponse(status_code=404,
+                            content={"error": "No crawl output found."})
+    with open(json_file_path, "r", encoding="utf-8") as f:
+        return JSONResponse(content=json.load(f))
 
 
 @app.get("/display-output", response_class=HTMLResponse)
@@ -563,10 +586,14 @@ async def update_config(config_update: ConfigUpdate, request: Request, db: Sessi
         current_username = cookies["current_username"]
     else:
         return result["response"]
+    if not crawler_installed():
+        return {"success": False,
+                "error": f"Crawler not installed at '{CRAWLER_DIR}'. "
+                         "See CRAWLER_DIR note in app.py."}
     try:
         crud.get_user(db, current_username)
-        # Path to the config.ts file in the gpt-crawler directory
-        config_file_path = os.path.join("gpt-crawler", "config.ts")
+        # Path to the config.ts file in the crawler directory
+        config_file_path = os.path.join(CRAWLER_DIR, "config.ts")
 
         # Read the current config.ts file content
         with open(config_file_path, "r") as f:
@@ -595,16 +622,15 @@ async def update_config(config_update: ConfigUpdate, request: Request, db: Sessi
 
 @app.post("/start-crawl")
 async def start_crawl():
+    if not crawler_installed():
+        return {"success": False,
+                "error": f"Crawler not installed at '{CRAWLER_DIR}'. "
+                         "See CRAWLER_DIR note in app.py."}
     try:
-        # Set the working directory to the gpt-crawler folder
-        working_directory = os.path.join(os.getcwd(), "gpt-crawler")
-
-        # Specify the full path to the npm executable
-        npm_path = "C:\Program Files\nodejs\npm.cmd"  # Replace with your npm path
-
-        # Run npm start in the gpt-crawler directory
+        # Run npm start inside the crawler directory
         result = subprocess.run(
-            f"cd gpt-crawler && npm start", shell=True, capture_output=True, text=True
+            "npm start", cwd=CRAWLER_DIR,
+            shell=True, capture_output=True, text=True
         )
 
         # Check if the crawler ran successfully
@@ -726,7 +752,7 @@ async def condense_output(request: Request, db: Session = Depends(get_db)):
         )
 
     # Construct the file path for the user-specific JSON file
-    json_file_path = f"gpt-crawler/{current_username}-1.json"
+    json_file_path = os.path.join(CRAWLER_DIR, f"{current_username}-1.json")
     print(f"Sending {json_file_path} to be condensed.")  # Log file path
 
     try:

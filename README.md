@@ -58,7 +58,7 @@ python -m pytest tests/test_voice.py -q     # 17 provider-free unit tests
 	- STT: Faster-Whisper / Deepgram / HF adapters
 	- LLM: OpenAI-compatible endpoints and local adapters
 	- TTS: ElevenLabs, XTTS, Piper, and other adapter modules
-- Crawler service: Embedded TypeScript crawler module in `gpt-crawler/`
+- Crawler: external [gpt-crawler](https://github.com/BuilderIO/gpt-crawler) tool for campaign knowledge ingestion (installed separately, see below)
 
 ## Architecture Overview
 
@@ -75,7 +75,8 @@ python -m pytest tests/test_voice.py -q     # 17 provider-free unit tests
 - `sql/`: ORM models, CRUD helpers, schema definitions
 - `openvoicechat/`: STT/LLM/TTS adapters and runtime utilities
 - `templates/` and `static/`: web UI views and assets
-- `gpt-crawler/`: website crawling pipeline used for knowledge ingestion
+- `voice/`: streaming telephony engine (STT/LLM/TTS, barge-in, metrics)
+- `twilio_outbound.py`: outbound call origination and media-stream handling
 - `utils/`: auth, logging, cookie/session helpers, prompt utilities
 
 ## Quick Start
@@ -102,8 +103,21 @@ source .venv/bin/activate
 
 ### 2. Install dependencies
 
+Outbound telephony + dashboard only (no local ML stack, recommended):
+```bash
+pip install -r requirements-streaming.txt
+```
+
+Full install including the browser-mic demo (local whisper/piper):
 ```bash
 pip install -r requirements.txt
+```
+
+Optional — site crawler for campaign knowledge ingestion (external tool,
+not part of this repo):
+```bash
+git clone https://github.com/BuilderIO/gpt-crawler gpt-crawler
+cd gpt-crawler && npm install
 ```
 
 ### 3. Configure environment variables

@@ -28,8 +28,8 @@ venv/
 .pytest_cache/
 
 # Node and build output in embedded crawler
-gpt-crawler/node_modules/
-gpt-crawler/dist/
-gpt-crawler/storage/
-gpt-crawler/*.json
-!gpt-crawler/.env.example
+# External crawler tool (BuilderIO/gpt-crawler) installed locally, not tracked
+gpt-crawler/
+speech_timing.csv
+sim_output/
+*.sqlite3
